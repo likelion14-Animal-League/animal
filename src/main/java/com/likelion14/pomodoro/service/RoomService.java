@@ -19,7 +19,7 @@ public class RoomService {
     private final RoomRepository roomRepository;
     private final GuestRepository guestRepository;
 
-// 1. 방 생성 로직
+// 1. 방 생성 로직/
     @Transactional
     public Room createRoom(String nickname, String avatarId, Integer maxGuests, Integer pomoMin, Integer breakMin, String disturbLevel) {
         // 랜덤 6자리 방 코드 생성 (중복 체크 포함)

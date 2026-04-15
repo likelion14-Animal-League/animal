@@ -34,7 +34,7 @@ public class RoomGuest {
     // isReady 필드는 요청하신 대로 제외되었습니다.
 
     private boolean isShielded = false; // 쉴드 활성 여부 [cite: 66]
-    private LocalDateTime shieldUntil; // 쉴드 만료 시각 [cite: 66]
+    private LocalDateTime shieldUntil; /// 쉴드 만료 시각 [cite: 66]
 
     private Integer consecutiveHits = 0; // 연속 피격 횟수 (3이면 쉴드 발동) [cite: 66]
     private Integer pomodoroCount = 0; // 완료한 뽀모도로 수 [cite: 66]

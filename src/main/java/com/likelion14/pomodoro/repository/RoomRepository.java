@@ -6,6 +6,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface RoomRepository extends JpaRepository<Room, UUID> {
-    // 입장 코드로 방 찾기 [cite: 17, 68]
+    ///입장 코드로 방 찾기 [cite: 17, 68]
     Optional<Room> findByRoomCode(String roomCode);
 }

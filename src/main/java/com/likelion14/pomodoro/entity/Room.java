@@ -29,7 +29,6 @@ public class Room {
     private Integer breakMinutes;
     private String disturbLevel;
 
-    // private LocalDateTime expiresAt; // <-- 이 줄을 삭제하거나 주석 처리하세요!
     private LocalDateTime createdAt = LocalDateTime.now();
 
     @OneToMany(mappedBy = "room", cascade = CascadeType.ALL, orphanRemoval = true)
