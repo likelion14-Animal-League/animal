@@ -3,6 +3,7 @@ package com.likelion14.pomodoro.controller;
 import com.likelion14.pomodoro.dto.RoomStatusResponse;
 import com.likelion14.pomodoro.entity.Room;
 import com.likelion14.pomodoro.entity.RoomGuest;
+import com.likelion14.pomodoro.handler.PomodoroWebSocketHandler;
 import com.likelion14.pomodoro.repository.RoomRepository;
 import com.likelion14.pomodoro.service.RoomService;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,8 @@ public class RoomController {
 
     private final RoomService roomService;
     private final RoomRepository roomRepository;
+    // 이제 컨트롤러에서 직접 웹소켓을 쏠 일이 적어지지만, 주입은 유지합니다.
+    private final PomodoroWebSocketHandler pomodoroWebSocketHandler;
 
     // 방 생성 API
     @PostMapping
@@ -40,8 +43,7 @@ public class RoomController {
                 "roomId", room.getId(),
                 "roomCode", room.getRoomCode(),
                 "guestId", host.getId(),
-                "guestToken", host.getGuestToken(),
-                "expiresAt", room.getExpiresAt()
+                "guestToken", host.getGuestToken()
         ));
     }
 
@@ -53,7 +55,6 @@ public class RoomController {
                 .orElseThrow(() -> new RuntimeException("방을 찾을 수 없습니다."));
 
         // 2. 참여자 목록을 DTO 형태(ParticipantDetail)로 변환
-        // boolean 타입의 getter는 롬복 규칙에 따라 isHost(), isShielded()를 사용합니다.
         List<RoomStatusResponse.ParticipantDetail> participants = room.getGuests().stream()
                 .map(g -> new RoomStatusResponse.ParticipantDetail(
                         g.getId(),
@@ -71,12 +72,14 @@ public class RoomController {
                 .map(RoomStatusResponse.ParticipantDetail::getGuestId)
                 .orElse(null);
 
+        // [수정 포인트] 가짜 브로드캐스트 try-catch 문을 삭제했습니다.
+        // 이제 웹소켓 알림은 누군가 나갔을 때(Disconnect) 자동으로 발생합니다.
+
         // 4. 최종 응답 반환
         return ResponseEntity.ok(new RoomStatusResponse(
                 room.getId(),
                 room.getRoomCode(),
                 room.getStatus(),
-                room.getExpiresAt(),
                 participants,
                 hostId
         ));
@@ -96,8 +99,7 @@ public class RoomController {
         return ResponseEntity.ok(Map.of(
                 "roomId", room.getId(),
                 "guestId", guest.getId(),
-                "guestToken", guest.getGuestToken(),
-                "expiresAt", room.getExpiresAt()
+                "guestToken", guest.getGuestToken()
         ));
     }
 }

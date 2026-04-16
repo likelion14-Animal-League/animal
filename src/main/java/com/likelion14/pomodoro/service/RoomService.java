@@ -84,4 +84,20 @@ public class RoomService {
         }
         return sb.toString();
     }
+    @Transactional
+    public String delegateHost(UUID roomId) {
+        Room room = roomRepository.findById(roomId)
+                .orElseThrow(() -> new RuntimeException("방을 찾을 수 없습니다."));
+
+        // 1. 현재 방장이 있는지 확인 (이미 나갔으면 없을 수 있음)
+        // 2. 남은 멤버 중 한 명을 선택 (여기서는 리스트의 첫 번째 사람)
+        return room.getGuests().stream()
+                .filter(g -> !g.isHost()) // 현재 방장이 아닌 사람 중
+                .findFirst()
+                .map(newHost -> {
+                    // 새로운 방장으로 승격시키는 로직 (엔티티에 메서드가 필요할 수 있음)
+                    // newHost.promoteToHost(); // 예시
+                    return newHost.getNickname();
+                }).orElse("공석");
+    }
 }

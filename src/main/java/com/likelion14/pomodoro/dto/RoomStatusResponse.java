@@ -6,15 +6,13 @@ import lombok.Getter;
 import lombok.Setter;
 import java.util.List;
 import java.util.UUID;
-import java.time.LocalDateTime;
 
 @Getter @Setter
-@AllArgsConstructor
+@AllArgsConstructor // [roomId, roomCode, status, participants, currentLeaderId] 순서로 생성자 생성
 public class RoomStatusResponse {
     private UUID roomId;
     private String roomCode;
-    private RoomStatus status;      // waiting | active | finished
-    private LocalDateTime expiresAt;
+    private RoomStatus status;
     private List<ParticipantDetail> participants;
     private UUID currentLeaderId;
 
