@@ -15,7 +15,7 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(authInterceptor)
-                .addPathPatterns("/v1/rooms/**") // 모든 방 관련 API에 적용
+                .addPathPatterns("/v1/rooms/**") // .모든 방 관련 API에 적용
                 .excludePathPatterns("/v1/rooms", "/v1/rooms/join"); // 생성과 참여는 토큰이 없으니 제외
     }
 }

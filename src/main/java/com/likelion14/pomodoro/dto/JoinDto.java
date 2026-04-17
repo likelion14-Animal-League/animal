@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 public class JoinDto {
 
     @Getter @Setter
-    public static class Request {
+    public static class Request {//.
         private String roomCode;
         private String nickname;
         private String avatarId;

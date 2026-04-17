@@ -40,6 +40,6 @@ public class Room {
         this.pomodoroMinutes = pomodoroMinutes;
         this.breakMinutes = breakMinutes;
         this.disturbLevel = disturbLevel;
-        // this.expiresAt = LocalDateTime.now().plusHours(4); // <-- 이 줄도 삭제!
+
     }
 }

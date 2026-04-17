@@ -9,7 +9,7 @@ CREATE TABLE rooms (
                        expires_at TIMESTAMP NOT NULL,
                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
+-- 안녕
 CREATE TABLE room_guests (
                              id BINARY(16) PRIMARY KEY,
                              room_id BINARY(16),

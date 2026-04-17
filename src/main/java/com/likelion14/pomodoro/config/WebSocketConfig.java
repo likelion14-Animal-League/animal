@@ -16,7 +16,7 @@ public class WebSocketConfig implements WebSocketConfigurer {
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
-        // ws://localhost:8080/ws/pomodoro 주소로 소켓 연결을 받음
+        // ws://localhost:8080/ws/pomodoro .주소로 소켓 연결을 받음
         registry.addHandler(pomodoroWebSocketHandler, "/ws/pomodoro")
                 .setAllowedOrigins("*"); // 테스트를 위해 모든 도메인 허용
     }

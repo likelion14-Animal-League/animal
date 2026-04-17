@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Getter @Setter
-@AllArgsConstructor // [roomId, roomCode, status, participants, currentLeaderId] 순서로 생성자 생성
+@AllArgsConstructor // [roomId, roomCode, status, participants, currentLeaderId] 순서로 생성자 생성s
 public class RoomStatusResponse {
     private UUID roomId;
     private String roomCode;

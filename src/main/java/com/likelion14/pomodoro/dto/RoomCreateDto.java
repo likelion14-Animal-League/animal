@@ -9,7 +9,7 @@ public class RoomCreateDto {
 
     @Getter @Setter
     public static class CreateRequest {
-        private String nickname;        // 최대 20자
+        private String nickname;        // 최대 20자.
         private String avatarId;
         private Integer maxGuests;      // 2 | 3 | 4
         private Integer pomodoroMinutes; // 기본 25

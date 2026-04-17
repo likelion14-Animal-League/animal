@@ -11,7 +11,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
 @RequiredArgsConstructor
 public class AuthInterceptor implements HandlerInterceptor {
 
-    private final GuestRepository guestRepository; // 레포지토리 주입
+    private final GuestRepository guestRepository; // 레포지토리 주입.
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
