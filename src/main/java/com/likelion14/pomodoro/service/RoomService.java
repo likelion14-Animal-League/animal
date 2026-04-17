@@ -19,6 +19,7 @@ public class RoomService {
 
     private final RoomRepository roomRepository;
     private final GuestRepository guestRepository;
+    private final NotificationService notificationService;
 
     @Transactional
     public Room createRoom(String nickname, String avatarId, Integer maxGuests, Integer pomoMin, Integer breakMin, String disturbLevel) {
@@ -102,5 +103,45 @@ public class RoomService {
             sb.append(String.format("%02x", b));
         }
         return sb.toString();
+    }
+
+    @Transactional
+    public void startAllTimers(UUID roomId, String hostToken) {
+        Room room = roomRepository.findById(roomId)
+                .orElseThrow(() -> new RuntimeException("방을 찾을 수 없습니다."));
+        RoomGuest requester = guestRepository.findByGuestToken(hostToken)
+                .orElseThrow(() -> new RuntimeException("유저를 찾을 수 없습니다."));
+
+        if (!requester.isHost()) {
+            throw new RuntimeException("방장만 전체 시작을 할 수 있습니다.");
+        }
+
+        // 모든 참여자의 타이머 상태 On
+        room.getGuests().forEach(RoomGuest::startIndividualTimer);
+        room.startRoom();
+
+        // 웹소켓 알림 전송
+        notificationService.notifyTimerStart(roomId);
+    }
+
+    @Transactional
+    public void pauseIndividual(String token) {
+        RoomGuest guest = guestRepository.findByGuestToken(token).orElseThrow();
+        guest.pauseIndividualTimer();
+        notificationService.notifyGuestStatus(guest.getRoom().getId(), guest, "PAUSED");
+    }
+
+    @Transactional
+    public void resumeIndividual(String token) {
+        RoomGuest guest = guestRepository.findByGuestToken(token).orElseThrow();
+        guest.startIndividualTimer();
+        notificationService.notifyGuestStatus(guest.getRoom().getId(), guest, "RESUMED");
+    }
+
+    @Transactional
+    public void completeCycle(String token) {
+        RoomGuest guest = guestRepository.findByGuestToken(token).orElseThrow();
+        guest.completeCycle();
+        notificationService.notifyGuestStatus(guest.getRoom().getId(), guest, "COMPLETED");
     }
 }

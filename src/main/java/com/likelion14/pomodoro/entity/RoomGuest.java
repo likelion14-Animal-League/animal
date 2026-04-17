@@ -46,4 +46,30 @@ public class RoomGuest {
         this.consecutiveHits = 0;
         this.pomodoroCount = 0;
     }
+
+    // 타이머 관련 필드
+    private boolean isTimerRunning = false;
+    private java.time.LocalDateTime lastStartedAt;
+    private long accumulatedSeconds = 0;
+    private int cycleCount = 0;
+
+    // 타이머 로직 메서드들
+    public void startIndividualTimer() {
+        this.isTimerRunning = true;
+        this.lastStartedAt = java.time.LocalDateTime.now();
+    }
+
+    public void pauseIndividualTimer() {
+        if (this.isTimerRunning && this.lastStartedAt != null) {
+            long gap = java.time.Duration.between(this.lastStartedAt, java.time.LocalDateTime.now()).getSeconds();
+            this.accumulatedSeconds += gap;
+        }
+        this.isTimerRunning = false;
+    }
+
+    public void completeCycle() {
+        this.cycleCount++;
+        this.accumulatedSeconds = 0;
+        this.isTimerRunning = false;
+    }
 }
