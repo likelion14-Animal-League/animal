@@ -42,4 +42,9 @@ public class Room {
         this.disturbLevel = disturbLevel;
 
     }
+    // Room.java 에 이 메서드를 추가하세요
+    public void startRoom() {
+        // 현재 엔티티의 status 필드를 active 상태로 변경합니다.
+        this.status = RoomStatus.active;
+    }
 }

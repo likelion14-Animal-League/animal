@@ -87,6 +87,8 @@ public class RoomController {
             p.put("avatarId", g.getAvatarId());
             p.put("isHost", g.isHost());
             p.put("isShielded", g.isShielded());
+            p.put("isTimerRunning", g.isTimerRunning());
+            p.put("cycleCount", g.getCycleCount());
             return p;
         }).collect(Collectors.toList());
 
@@ -94,20 +96,34 @@ public class RoomController {
 
         return ResponseEntity.ok(response);
     }
+    // 4. 타이머 전체 시작 (방장 전용)
+    @PostMapping("/{roomId}/start")
+    public ResponseEntity<?> startTimer(
+            @PathVariable UUID roomId,
+            @RequestHeader("X-Guest-Token") String guestToken) {
+
+        roomService.startAllTimers(roomId, guestToken); // 서비스 메서드명 확인!
+        return ResponseEntity.ok(Map.of("message", "타이머가 시작되었습니다."));
+    }
+
+    // 5. 내 타이머 일시정지
+    @PostMapping("/me/pause")
+    public ResponseEntity<?> pauseMe(@RequestHeader("X-Guest-Token") String token) {
+        roomService.pauseIndividual(token);
+        return ResponseEntity.ok(Map.of("message", "일시정지 완료"));
+    }
+
+    // 6. 내 타이머 재개
+    @PostMapping("/me/resume")
+    public ResponseEntity<?> resumeMe(@RequestHeader("X-Guest-Token") String token) {
+        roomService.resumeIndividual(token);
+        return ResponseEntity.ok(Map.of("message", "재개 완료"));
+    }
+
+    // 7. 한 바퀴 완료
+    @PostMapping("/me/complete")
+    public ResponseEntity<?> completeMe(@RequestHeader("X-Guest-Token") String token) {
+        roomService.completeCycle(token);
+        return ResponseEntity.ok(Map.of("message", "바퀴 수 증가 완료"));
+    }
 }
-//-방 생성 (POST /v1/rooms)
-//방 설정(시간, 난이도 등) 저장 및 6자리 랜덤 코드 생성.
-//생성자를 방장(Host)으로 설정하고 guestToken 발급.
-//
-//        -방 참여 (POST /v1/rooms/join)
-//방 코드로 입장 및 일반 유저(Guest) 토큰 발급.
-//
-//        -방 상태 조회 (GET /v1/rooms/{roomId})
-//방 정보 및 현재 참여 중인 유저 목록(참여자 정보) 반환.
-//
-//        -실시간 유저 관리 (WebSocket)
-//웹소켓 연결 시 유저 세션 관리.
-//퇴장 처리: 웹소켓 연결 종료 시 DB에서 해당 유저 삭제 및 방장 위임(Host Migration) 로직 구현 완료.
-//
-//        -엔티티 설계 고도화
-//isReady 제거(명세서 기반 간소화), isShielded, consecutiveHits 등 방해하기 기능용 필드 구성.
