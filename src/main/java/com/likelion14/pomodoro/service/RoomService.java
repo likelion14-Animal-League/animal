@@ -229,23 +229,45 @@ public class RoomService {
         applyDisturbanceEffects(target);
 
         // 3. 문제 및 정답 생성
-        String problem;
-        String solution;
+        String problem = "";
+        String solution = "";
 
         if ("baseball".equals(gameType)) {
             // 숫자 야구 타입인 경우
             problem = "숫자 야구: 3자리 숫자를 맞히세요!";
             solution = generateBaseballSolution();
-        } else {
+        } else if("math".equals(gameType)) {
             // 기본은 사칙연산 (math) - 30% 확률로 혼합 연산
             Random random = new Random();
-            Map<String, String> mathProblem = (random.nextInt(10) < 3)
+            Map<String, String> mathProblem = (random.nextInt(10) < 7)
                     ? generateMixedArithmetic()
                     : generateBasicArithmetic();
             problem = mathProblem.get("problem");
             solution = mathProblem.get("solution");
         }
+        else if ("stroop".equals(gameType)) {
+            String[] colorNames = {"빨강", "파랑", "초록", "노랑", "보라", "주황"};
+            String[] colorHexCodes = {"#FF0000", "#0000FF", "#008000", "#FFFF00", "#800080", "#FFA500"};
 
+            Random random = new Random();
+
+            // 1. 보여줄 '글자' 선택 (예: "빨강")
+            int textIdx = random.nextInt(colorNames.length);
+            String textValue = colorNames[textIdx];
+
+            // 2. 실제로 입힐 '색상' 선택 (글자랑 다르게 설정)
+            int colorIdx;
+            do {
+                colorIdx = random.nextInt(colorNames.length);
+            } while (colorIdx == textIdx); // 글자와 색상이 다를 때까지 반복
+
+            String colorHex = colorHexCodes[colorIdx]; // 프론트 전달용 (예: #0000FF)
+            String colorName = colorNames[colorIdx];   // 실제 정답 (예: "파랑")
+
+            // problem: "글자:헥사코드" 형태로 저장 (프론트에서 split해서 쓰기 좋게)
+            problem = textValue + ":" + colorHex;
+            solution = colorName;
+        }
         // 4. 방해 데이터 저장 (타입에 맞는 problem, solution이 들어감)
         Disturbance disturbance = new Disturbance(
                 gameType,
