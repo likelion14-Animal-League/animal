@@ -3,6 +3,7 @@ package com.likelion14.pomodoro.entity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -12,11 +13,13 @@ import java.util.UUID;
 @Entity
 @Table(name = "rooms")
 @Getter
+@Setter
 @NoArgsConstructor
 public class Room {
     @Id
     @Column(columnDefinition = "BINARY(16)")
     private UUID id = UUID.randomUUID();
+    private UUID currentLeaderId;
 
     @Column(unique = true, length = 6, nullable = false)
     private String roomCode;

@@ -3,14 +3,17 @@ package com.likelion14.pomodoro.service;
 import com.likelion14.pomodoro.entity.Disturbance;
 import com.likelion14.pomodoro.entity.Room;
 import com.likelion14.pomodoro.entity.RoomGuest;
+import com.likelion14.pomodoro.entity.RoomStatus;
 import com.likelion14.pomodoro.repository.DisturbanceRepository;
 import com.likelion14.pomodoro.repository.GuestRepository;
 import com.likelion14.pomodoro.repository.RoomRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -26,21 +29,23 @@ public class RoomService {
 
     @Transactional
     public Room createRoom(String nickname, String avatarId, Integer maxGuests, Integer pomoMin, Integer breakMin, String disturbLevel) {
-        // 1. 방 코드 생성
-        String roomCode;
-        do {
-            roomCode = generateRandomCode();
-        } while (roomRepository.findByRoomCode(roomCode).isPresent());
+        String roomCode = "";
+        int attempt = 0;
 
-        // 2. 방 저장
+        while (attempt < 5) { // 최대 10번까지만 시도
+            roomCode = generateRandomCode();
+            if (roomRepository.findByRoomCode(roomCode).isEmpty()) {
+                break;
+            }
+            attempt++;
+            if (attempt >= 5) throw new RuntimeException("방 코드를 생성할 수 없습니다. 다시 시도해주세요.");
+        }
+
         Room room = new Room(roomCode, maxGuests, pomoMin, breakMin, disturbLevel);
         roomRepository.save(room);
 
-        // 3. 방장 생성 및 저장
         String guestToken = generateHex64Token();
         RoomGuest host = new RoomGuest(room, nickname, avatarId, guestToken, true);
-
-        // [중요] 컨트롤러에서 IndexOutOfBoundsException이 안 나게 리스트에 직접 추가
         room.getGuests().add(host);
 
         guestRepository.save(host);
@@ -198,10 +203,14 @@ public class RoomService {
         target.pauseIndividualTimer();
 
         // 연속 3번 맞으면 쉴드 활성화 및 콤보 초기화
-//        if (target.getConsecutiveHits() >= 3) {
-//            target.setShielded(true);
-//            target.resetConsecutiveHits();
-//        } 테스트를 위해 주석처리
+        if (target.getConsecutiveHits() >= 3) {
+            target.setShielded(true);           //
+            // 현재 시간으로부터 1분 뒤까지 쉴드 유지
+            target.setShieldUntil(LocalDateTime.now().plusMinutes(1)); //
+
+            // 웹소켓 알림 전송 (shield:activated)
+            notificationService.notifyShieldActivated(target.getRoom().getId(), target.getId());
+        }
     }
 
     @Transactional
@@ -440,4 +449,68 @@ public class RoomService {
         }
         return strikes + "S " + balls + "B";
     }
+    @Transactional
+    public RoomGuest rotateLeader(UUID roomId) {
+        Room room = roomRepository.findById(roomId)
+                .orElseThrow(() -> new RuntimeException("ROOM_NOT_FOUND"));
+
+        // 1. 현재 모든 참여자 목록을 가져옴
+        List<RoomGuest> allGuests = room.getGuests();
+        UUID oldLeaderId = room.getCurrentLeaderId();
+
+        // 2. 기존 방장을 찾아서 false로 변경 (메모리 상의 객체 상태 변경)
+        allGuests.stream()
+                .filter(g -> g.isHost() || g.getId().equals(oldLeaderId))
+                .forEach(g -> g.setHost(false));
+
+        // 3. 새 방장 후보 추출 (기존 방장 제외)
+        List<RoomGuest> candidates = allGuests.stream()
+                .filter(g -> !g.getId().equals(oldLeaderId))
+                .collect(Collectors.toList());
+
+        if (candidates.isEmpty()) return null;
+
+        // 4. 새 방장 선출 및 설정
+        Collections.shuffle(candidates);
+        RoomGuest newLeader = candidates.get(0);
+
+        newLeader.setHost(true); // 새 방장 권한 부여
+        room.setCurrentLeaderId(newLeader.getId()); // 방 정보 업데이트
+
+        // 5. DB에 즉시 반영
+        // dirty checking으로 변경되지만, 확실히 하기 위해 flush를 호출합니다.
+        guestRepository.flush();
+
+        // 웹소켓 알림 전송
+        notificationService.notifyLeaderChanged(roomId, newLeader);
+
+        return newLeader;
+    }
+
+    public Map<String, Object> getSessionResult(UUID roomId) {
+        List<RoomGuest> participants = guestRepository.findByRoomId(roomId); //
+
+        // 각 분야별 '왕' 선정 [cite: 53]
+        RoomGuest focusKing = participants.stream()
+                .max(Comparator.comparing(RoomGuest::getPomodoroCount)).orElse(null);
+        RoomGuest slackerKing = participants.stream()
+                .max(Comparator.comparing(RoomGuest::getReceivedDisturbances)).orElse(null);
+        RoomGuest annoyanceKing = participants.stream()
+                .max(Comparator.comparing(RoomGuest::getSentDisturbances)).orElse(null);
+
+        // 명세서 규격에 맞게 리턴 [cite: 53]
+        Map<String, Object> result = new HashMap<>();
+        result.put("focusKing", focusKing != null ? focusKing.getId() : null);
+        result.put("slackerKing", slackerKing != null ? slackerKing.getId() : null);
+        result.put("annoyanceKing", annoyanceKing != null ? annoyanceKing.getId() : null);
+
+        return result;
+    }
+    private void setupStroopGame(String[] colorNames) {
+        Random random = new Random();
+        int textIdx = random.nextInt(colorNames.length);
+        int colorIdx = (textIdx + 1 + random.nextInt(colorNames.length - 1)) % colorNames.length;
+        // do-while을 아예 없애면 무한 루프 확률이 0%가 됩니다.
+    }
 }
+

@@ -67,6 +67,28 @@ public class RoomController {
         return ResponseEntity.ok(response);
     }
 
+    // [추가] 시나리오 4: 방 나가기 및 자동 삭제 테스트용
+    @PostMapping("/{roomId}/leave")
+    public ResponseEntity<?> leaveRoom(
+            @PathVariable UUID roomId,
+            @RequestHeader("X-Guest-Token") String token) {
+
+        // 서비스의 handleDisconnect 호출
+        String result = roomService.handleDisconnect(roomId, token);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("result", result);
+
+        // 방이 삭제되었는지, 아니면 그냥 유저만 나갔는지 메시지 전달
+        if ("ROOM_DELETED".equals(result)) {
+            response.put("message", "마지막 참여자가 퇴장하여 방이 삭제되었습니다.");
+        } else {
+            response.put("message", "퇴장 처리가 완료되었습니다. 다음 방장: " + result);
+        }
+
+        return ResponseEntity.ok(response);
+    }
+
     // 3. 방 상태 상세 조회 (이 부분이 없어서 404가 났던 것입니다!)
     @GetMapping("/{roomId}")
     public ResponseEntity<?> getRoom(@PathVariable UUID roomId) {
@@ -170,4 +192,26 @@ public class RoomController {
         return ResponseEntity.ok(Map.of("message", "검증 요청 완료"));
     }
 
+    @PostMapping("/sessions/{roomId}/leader/rotate")
+    public ResponseEntity<?> rotateLeader(
+            @PathVariable UUID roomId,
+            @RequestHeader("X-Guest-Token") String token) {
+
+        // 1. (선택사항) 토큰을 가진 유저가 방장인지 권한 체크 로직이 필요할 수 있습니다.
+
+        // 2. 서비스의 rotateLeader 호출
+        RoomGuest newLeader = roomService.rotateLeader(roomId);
+
+        if (newLeader == null) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "교체할 참여자가 없습니다."));
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("newLeaderId", newLeader.getId());
+        response.put("newLeaderNickname", newLeader.getNickname());
+        response.put("message", "팀장이 성공적으로 교체되었습니다.");
+
+        return ResponseEntity.ok(response);
+    }
 }
