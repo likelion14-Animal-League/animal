@@ -72,4 +72,30 @@ public class RoomGuest {
         this.accumulatedSeconds = 0;
         this.isTimerRunning = false;
     }
+    // RoomGuest.java
+// 연속으로 방해받은 횟수 (콤보 등 활용 가능)
+    public void setShield(boolean status) {
+        this.isShielded = status;
+    }
+    // RoomGuest.java
+
+    // 방해 성공 시 호출할 메서드
+    public void incrementConsecutiveHits() {
+        this.consecutiveHits += 1;
+    }
+
+    // 쉴드로 막거나 사이클 완료 시 초기화할 메서드
+    public void resetConsecutiveHits() {
+        this.consecutiveHits = 0;
+    }
+    // RoomGuest.java
+    public void setShielded(boolean isShielded) {
+        this.isShielded = isShielded;
+    }
+    // RoomGuest.java 내부
+
+    // 팀장 권한을 주거나 뺏는 메서드
+    public void setHost(boolean host) {
+        this.isHost = host;
+    }
 }

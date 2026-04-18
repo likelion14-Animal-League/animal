@@ -90,6 +90,9 @@ public class RoomController {
             p.put("isShielded", g.isShielded());
             p.put("isTimerRunning", g.isTimerRunning());
             p.put("cycleCount", g.getCycleCount());
+            // RoomController.java의 getRoom 메서드 내부 participants 맵핑 부분
+            p.put("consecutiveHits", g.getConsecutiveHits()); // 이 줄을 추가하세요!
+
             return p;
         }).collect(Collectors.toList());
 
@@ -127,4 +130,15 @@ public class RoomController {
         roomService.completeCycle(token);
         return ResponseEntity.ok(Map.of("message", "바퀴 수 증가 완료"));
     }
+
+    // RoomController.java
+    @PostMapping("/disturb/{targetId}")
+    public ResponseEntity<?> disturb(
+            @RequestHeader("X-Guest-Token") String attackerToken,
+            @PathVariable UUID targetId) {
+
+        roomService.disturbUser(attackerToken, targetId);
+        return ResponseEntity.ok(Map.of("message", "방해하기 요청 완료"));
+    }
+
 }

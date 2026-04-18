@@ -9,8 +9,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
+import java.util.Collections;
 import java.util.UUID;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -125,6 +127,51 @@ public class RoomService {
     }
 
     @Transactional
+    public void completeCycle(String guestToken) {
+        // 1. 현재 완료를 누른 사람(현재 팀장/방장) 찾기
+        RoomGuest currentHost = guestRepository.findByGuestToken(guestToken)
+                .orElseThrow(() -> new RuntimeException("GUEST_NOT_FOUND")); //
+        Room room = currentHost.getRoom();
+
+        // 2. 권한 확인: 팀장(is_host)만 사이클 완료 및 교체 가능 [cite: 11, 22]
+        if (!currentHost.isHost()) {
+            throw new RuntimeException("NOT_HOST"); //
+        }
+
+        // 3. 현재 팀장의 사이클 수 증가 및 상태 업데이트 [cite: 66]
+        currentHost.completeCycle();
+        notificationService.notifyGuestStatus(room.getId(), currentHost, "COMPLETED");
+
+        // 4. 직전 팀장(본인)을 제외한 나머지 참여자 목록 확보
+        List<RoomGuest> potentialCandidates = room.getGuests().stream()
+                .filter(g -> !g.getId().equals(currentHost.getId()))
+                .collect(Collectors.toList());
+
+        if (!potentialCandidates.isEmpty()) {
+            // --- [명세서 6번: 자동 방해 발사] ---
+            // 나머지 인원 중 랜덤 한 명에게 방해 시전
+            Collections.shuffle(potentialCandidates);
+            RoomGuest targetToDisturb = potentialCandidates.get(0);
+            this.disturbUser(guestToken, targetToDisturb.getId());
+
+            // --- [명세서 5번: 팀장 교체 (Leader Rotate)] ---
+            // 다시 섞어서 새로운 팀장 선출 (직전 팀장 제외 랜덤)
+            Collections.shuffle(potentialCandidates);
+            RoomGuest nextHost = potentialCandidates.get(0);
+
+            // 권한 변경: 기존 팀장 해제 -> 새 팀장 승격
+            currentHost.setHost(false);
+            nextHost.setHost(true);
+
+            // 5. 웹소켓 알림: leader:changed 이벤트 전송
+            notificationService.notifyHostChanged(room.getId(), currentHost.getNickname(), nextHost.getNickname());
+
+            // 추가로 명세서에 정의된 timer:completed 이벤트도 보낼 수 있습니다
+            // notificationService.notifyTimerCompleted(room.getId(), currentHost.getId(), nextHost.getId());
+        }
+    }
+
+    @Transactional
     public void pauseIndividual(String token) {
         RoomGuest guest = guestRepository.findByGuestToken(token).orElseThrow();
         guest.pauseIndividualTimer();
@@ -138,10 +185,36 @@ public class RoomService {
         notificationService.notifyGuestStatus(guest.getRoom().getId(), guest, "RESUMED");
     }
 
+
     @Transactional
-    public void completeCycle(String token) {
-        RoomGuest guest = guestRepository.findByGuestToken(token).orElseThrow();
-        guest.completeCycle();
-        notificationService.notifyGuestStatus(guest.getRoom().getId(), guest, "COMPLETED");
+    public void disturbUser(String attackerToken, UUID targetGuestId) {
+        // 1. 공격자 확인
+        RoomGuest attacker = guestRepository.findByGuestToken(attackerToken)
+                .orElseThrow(() -> new RuntimeException("공격자를 찾을 수 없습니다."));
+
+        // 2. 타겟(수비자) 확인
+        RoomGuest target = guestRepository.findById(targetGuestId)
+                .orElseThrow(() -> new RuntimeException("대상자를 찾을 수 없습니다."));
+
+        // 3. 방해 로직 (상대방이 쉴드 상태가 아닐 때만)
+        if (target.isShielded()) {
+            // 상대가 쉴드라면 공격 실패 알림만 보냄
+            target.resetConsecutiveHits();
+            notificationService.notifyDisturbResult(target.getRoom().getId(), attacker.getNickname(), target.getNickname(), "BLOCKED");
+        } else {
+            // 공격 성공: 상대방 타이머 일시정지
+            target.incrementConsecutiveHits();
+            target.pauseIndividualTimer();
+
+            // [추가된 로직] 연속 3번 공격받으면 쉴드 활성화!
+            String status = "SUCCESS";
+            if (target.getConsecutiveHits() >= 3) {
+                target.setShielded(true); // 쉴드 켜기
+                target.resetConsecutiveHits(); // 콤보 초기화
+                status = "SUCCESS_AND_SHIELD_ACTIVATED"; // 특수 상태값 전송
+            }
+
+            notificationService.notifyDisturbResult(target.getRoom().getId(), attacker.getNickname(), target.getNickname(), "SUCCESS");
+        }
     }
 }
