@@ -66,26 +66,37 @@ public class RoomService {
         RoomGuest leaver = guestRepository.findByGuestToken(guestToken)
                 .orElseThrow(() -> new RuntimeException("GUEST_NOT_FOUND"));
 
+        Room room = roomRepository.findById(roomId)
+                .orElseThrow(() -> new RuntimeException("ROOM_NOT_FOUND"));
+
         UUID leaverId = leaver.getId();
         boolean wasHost = leaver.isHost();
 
+        // 1. 게스트 먼저 삭제
         guestRepository.delete(leaver);
-        guestRepository.flush();
+        guestRepository.flush(); // 즉시 반영해서 카운트를 정확하게 잡음
 
+        // 2. [추가] 방에 남은 인원 체크 (방 삭제 로직)
+        // leaver를 지웠으니, DB에 남은 인원이 0이면 방을 지웁니다.
+        if (guestRepository.countByRoom(room) == 0) {
+            roomRepository.delete(room);
+            System.out.println("방 삭제 완료: " + room.getRoomCode());
+            return "ROOM_DELETED"; // 방이 사라졌음을 알림
+        }
+
+        // 3. 방장이 나갔을 경우 권한 위임
         if (wasHost) {
-            Room room = roomRepository.findById(roomId)
-                    .orElseThrow(() -> new RuntimeException("ROOM_NOT_FOUND"));
-
             return guestRepository.findByRoom(room).stream()
                     .filter(g -> !g.getId().equals(leaverId))
                     .findFirst()
                     .map(newHost -> {
                         newHost.promoteToHost();
                         guestRepository.save(newHost);
-                        return newHost.getNickname();
+                        return newHost.getNickname(); // 새 방장 닉네임 리턴
                     }).orElse("공석");
         }
-        return "일반 유저";
+
+        return "일반 유저 퇴장";
     }
 
     private String generateRandomCode() {
