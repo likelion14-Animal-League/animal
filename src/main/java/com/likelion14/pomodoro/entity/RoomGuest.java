@@ -3,6 +3,8 @@ package com.likelion14.pomodoro.entity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import java.time.LocalDateTime;
+import java.time.Duration;
 import java.util.UUID;
 
 @Entity
@@ -27,14 +29,22 @@ public class RoomGuest {
 
     private boolean isHost = false;
 
-    // 명세서 v2.0 필수 필드들s
+    // --- 명세서 v2.0 필수 필드  ---
     private boolean isShielded = false;
-    private int consecutiveHits = 0;
-    private int pomodoroCount = 0;
+    private int consecutiveHits = 0; // 연속 피격 횟수
+    private int pomodoroCount = 0;   // 완료한 뽀모도로 수
 
-    public void promoteToHost() {
-        this.isHost = true;
-    }
+    @Column(name = "received_disturbances")
+    private int receivedDisturbances = 0; // 받은 방해 횟수
+
+    @Column(name = "sent_disturbances")
+    private int sentDisturbances = 0;     // 발사한 방해 횟수
+
+    // --- 타이머 관련 필드 ---
+    private boolean isTimerRunning = false;
+    private LocalDateTime lastStartedAt;
+    private long accumulatedSeconds = 0;
+    private int cycleCount = 0;
 
     public RoomGuest(Room room, String nickname, String avatarId, String guestToken, boolean isHost) {
         this.room = room;
@@ -42,26 +52,28 @@ public class RoomGuest {
         this.avatarId = avatarId;
         this.guestToken = guestToken;
         this.isHost = isHost;
-        this.isShielded = false;
-        this.consecutiveHits = 0;
-        this.pomodoroCount = 0;
     }
 
-    // 타이머 관련 필드
-    private boolean isTimerRunning = false;
-    private java.time.LocalDateTime lastStartedAt;
-    private long accumulatedSeconds = 0;
-    private int cycleCount = 0;
+    // --- 비즈니스 로직 메서드 ---
 
-    // 타이머 로직 메서드들
+    // 1. 권한 관련
+    public void setHost(boolean host) {
+        this.isHost = host;
+    }
+
+    public void promoteToHost() {
+        this.isHost = true;
+    }
+
+    // 2. 타이머 관련
     public void startIndividualTimer() {
         this.isTimerRunning = true;
-        this.lastStartedAt = java.time.LocalDateTime.now();
+        this.lastStartedAt = LocalDateTime.now();
     }
 
     public void pauseIndividualTimer() {
         if (this.isTimerRunning && this.lastStartedAt != null) {
-            long gap = java.time.Duration.between(this.lastStartedAt, java.time.LocalDateTime.now()).getSeconds();
+            long gap = Duration.between(this.lastStartedAt, LocalDateTime.now()).getSeconds();
             this.accumulatedSeconds += gap;
         }
         this.isTimerRunning = false;
@@ -69,33 +81,29 @@ public class RoomGuest {
 
     public void completeCycle() {
         this.cycleCount++;
+        this.pomodoroCount++; // 명세서 카운트도 같이 증가
         this.accumulatedSeconds = 0;
         this.isTimerRunning = false;
     }
-    // RoomGuest.java
-// 연속으로 방해받은 횟수 (콤보 등 활용 가능)
-    public void setShield(boolean status) {
-        this.isShielded = status;
-    }
-    // RoomGuest.java
 
-    // 방해 성공 시 호출할 메서드
+    // 3. 방해 및 쉴드 관련 [cite: 41, 44]
     public void incrementConsecutiveHits() {
         this.consecutiveHits += 1;
     }
 
-    // 쉴드로 막거나 사이클 완료 시 초기화할 메서드
     public void resetConsecutiveHits() {
         this.consecutiveHits = 0;
     }
-    // RoomGuest.java
+
     public void setShielded(boolean isShielded) {
         this.isShielded = isShielded;
     }
-    // RoomGuest.java 내부
 
-    // 팀장 권한을 주거나 뺏는 메서드
-    public void setHost(boolean host) {
-        this.isHost = host;
+    public void incrementReceivedDisturbances() {
+        this.receivedDisturbances += 1;
+    }
+
+    public void incrementSentDisturbances() {
+        this.sentDisturbances += 1;
     }
 }

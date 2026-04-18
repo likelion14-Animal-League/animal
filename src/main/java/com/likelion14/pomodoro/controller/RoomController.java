@@ -132,13 +132,42 @@ public class RoomController {
     }
 
     // RoomController.java
-    @PostMapping("/disturb/{targetId}")
-    public ResponseEntity<?> disturb(
-            @RequestHeader("X-Guest-Token") String attackerToken,
-            @PathVariable UUID targetId) {
+    // [수정] 7. 한 바퀴 완료 (명세서 v2.0: POST /v1/sessions/{sessionId}/complete)
+    // 컨트롤러 상단이 /v1/rooms 라면 주소를 아래처럼 명시적으로 잡아야 합니다.
+    @PostMapping("/sessions/{roomId}/complete")
+    public ResponseEntity<?> completeMe(
+            @PathVariable UUID roomId, // 명세서 규격상 sessionId를 받음
+            @RequestHeader("X-Guest-Token") String token) {
+        roomService.completeCycle(token);
+        return ResponseEntity.ok(Map.of("message", "바퀴 수 증가 및 팀장 교체 완료"));
+    }
 
-        roomService.disturbUser(attackerToken, targetId);
-        return ResponseEntity.ok(Map.of("message", "방해하기 요청 완료"));
+    // [수정] 방해하기 (명세서 v2.0: POST /{sessionId}/disturbance)
+    @PostMapping("/sessions/{roomId}/disturbance")
+    public ResponseEntity<?> disturb(
+            @PathVariable UUID roomId,
+            @RequestHeader("X-Guest-Token") String attackerToken,
+            @RequestBody Map<String, String> request) {
+
+        // 명세서에는 targetId를 바디(JSON)로 받거나 쿼리로 받도록 되어 있을 겁니다.
+        // 여기서는 명세서 6번 규격에 맞춰 targetId를 가져옵니다.
+        UUID targetId = UUID.fromString(request.get("targetGuestId"));
+        String gameType = request.getOrDefault("gameType", "math");
+
+        roomService.launchMinigame(attackerToken, targetId, gameType);
+        return ResponseEntity.ok(Map.of("message", "미니게임 발사 완료"));
+    }
+
+    // SessionController 또는 RoomController
+    @PostMapping("/sessions/disturbances/{disturbanceId}/complete")
+    public ResponseEntity<?> completeDisturbance(
+            @PathVariable UUID disturbanceId,
+            @RequestBody Map<String, String> request) {
+
+        String answer = request.get("answer");
+        roomService.completeDisturbance(disturbanceId, answer);
+
+        return ResponseEntity.ok(Map.of("message", "검증 요청 완료"));
     }
 
 }
