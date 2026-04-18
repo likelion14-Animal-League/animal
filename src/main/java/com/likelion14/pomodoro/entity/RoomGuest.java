@@ -3,6 +3,8 @@ package com.likelion14.pomodoro.entity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 import java.time.LocalDateTime;
 import java.time.Duration;
 import java.util.UUID;
@@ -10,6 +12,7 @@ import java.util.UUID;
 @Entity
 @Table(name = "room_guests")
 @Getter
+@Setter
 @NoArgsConstructor
 public class RoomGuest {
 
@@ -45,6 +48,11 @@ public class RoomGuest {
     private LocalDateTime lastStartedAt;
     private long accumulatedSeconds = 0;
     private int cycleCount = 0;
+
+    private LocalDateTime shieldUntil; //(쉴드 만료 시각)
+
+
+    private LocalDateTime lastPingAt; //(최근 응답 시각)
 
     public RoomGuest(Room room, String nickname, String avatarId, String guestToken, boolean isHost) {
         this.room = room;
