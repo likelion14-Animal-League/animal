@@ -4,7 +4,11 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Entity
 @Getter
@@ -40,4 +44,15 @@ public class Disturbance {
     public void complete() {
         this.isResolved = true;
     }
+
+    private String generateBaseballSolution() {
+        List<Integer> numbers = new ArrayList<>(List.of(1, 2, 3, 4, 5, 6, 7, 8, 9));
+        Collections.shuffle(numbers);
+        // 중복 없는 3자리 숫자 생성
+        return numbers.stream()
+                .limit(3)
+                .map(String::valueOf)
+                .collect(Collectors.joining());
+    }
+
 }

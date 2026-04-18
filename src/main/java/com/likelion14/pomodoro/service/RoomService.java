@@ -129,46 +129,42 @@ public class RoomService {
 
     @Transactional
     public void completeCycle(String guestToken) {
-        // 1. 현재 완료를 누른 사람(현재 팀장/방장) 찾기
         RoomGuest currentHost = guestRepository.findByGuestToken(guestToken)
-                .orElseThrow(() -> new RuntimeException("GUEST_NOT_FOUND")); //
+                .orElseThrow(() -> new RuntimeException("GUEST_NOT_FOUND"));
         Room room = currentHost.getRoom();
 
-        // 2. 권한 확인: 팀장(is_host)만 사이클 완료 및 교체 가능 [cite: 11, 22]
         if (!currentHost.isHost()) {
-            throw new RuntimeException("NOT_HOST"); //
+            throw new RuntimeException("NOT_HOST");
         }
 
-        // 3. 현재 팀장의 사이클 수 증가 및 상태 업데이트 [cite: 66]
         currentHost.completeCycle();
         notificationService.notifyGuestStatus(room.getId(), currentHost, "COMPLETED");
 
-        // 4. 직전 팀장(본인)을 제외한 나머지 참여자 목록 확보
+        // 방장을 제외한 나머지 참여자들
         List<RoomGuest> potentialCandidates = room.getGuests().stream()
                 .filter(g -> !g.getId().equals(currentHost.getId()))
                 .collect(Collectors.toList());
 
+        // 참여자가 1명 이상 있어야 교체 가능
         if (!potentialCandidates.isEmpty()) {
-            // --- [명세서 6번: 자동 방해 발사] ---
-            // 나머지 인원 중 랜덤 한 명에게 방해 시전
-            Collections.shuffle(potentialCandidates);
-            RoomGuest targetToDisturb = potentialCandidates.get(0);
-            this.disturbUser(guestToken, targetToDisturb.getId());
-
-            // --- [명세서 5번: 팀장 교체 (Leader Rotate)] ---
-            // 다시 섞어서 새로운 팀장 선출 (직전 팀장 제외 랜덤)
             Collections.shuffle(potentialCandidates);
             RoomGuest nextHost = potentialCandidates.get(0);
 
-            // 권한 변경: 기존 팀장 해제 -> 새 팀장 승격
+            // 권한 변경
             currentHost.setHost(false);
             nextHost.setHost(true);
 
-            // 5. 웹소켓 알림: leader:changed 이벤트 전송
-            notificationService.notifyHostChanged(room.getId(), currentHost.getNickname(), nextHost.getNickname());
+            // DB에 명시적으로 저장 (변경 감지가 안 될 때를 대비)
+            guestRepository.save(currentHost);
+            guestRepository.save(nextHost);
 
-            // 추가로 명세서에 정의된 timer:completed 이벤트도 보낼 수 있습니다
-            // notificationService.notifyTimerCompleted(room.getId(), currentHost.getId(), nextHost.getId());
+            // 중요: 변경 사항을 즉시 DB에 꽂아넣음
+            guestRepository.flush();
+
+            notificationService.notifyHostChanged(room.getId(), currentHost.getNickname(), nextHost.getNickname());
+        } else {
+            // 혼자일 경우 로그를 찍어보면 디버깅이 편해요!
+            System.out.println("대기 중인 참여자가 없어 방장이 유지됩니다.");
         }
     }
 
@@ -191,10 +187,10 @@ public class RoomService {
         target.pauseIndividualTimer();
 
         // 연속 3번 맞으면 쉴드 활성화 및 콤보 초기화
-        if (target.getConsecutiveHits() >= 3) {
-            target.setShielded(true);
-            target.resetConsecutiveHits();
-        }
+//        if (target.getConsecutiveHits() >= 3) {
+//            target.setShielded(true);
+//            target.resetConsecutiveHits();
+//        } 테스트를 위해 주석처리
     }
 
     @Transactional
@@ -229,23 +225,36 @@ public class RoomService {
         // 1. 공격자 수치 업데이트
         attacker.incrementSentDisturbances();
 
-        // 2. 타겟에게 공통 방해 효과 적용 (받은 횟수+, 콤보+, 타이머 정지, 쉴드체크)
+        // 2. 타겟에게 공통 방해 효과 적용
         applyDisturbanceEffects(target);
 
-        // 3. 문제 생성 (30% 확률로 혼합 연산)
-        Random random = new Random();
-        Map<String, String> mathProblem = (random.nextInt(10) < 3)
-                ? generateMixedArithmetic()
-                : generateBasicArithmetic();
+        // 3. 문제 및 정답 생성
+        String problem;
+        String solution;
 
-        // 4. 방해 데이터 저장
+        if ("baseball".equals(gameType)) {
+            // 숫자 야구 타입인 경우
+            problem = "숫자 야구: 3자리 숫자를 맞히세요!";
+            solution = generateBaseballSolution();
+        } else {
+            // 기본은 사칙연산 (math) - 30% 확률로 혼합 연산
+            Random random = new Random();
+            Map<String, String> mathProblem = (random.nextInt(10) < 3)
+                    ? generateMixedArithmetic()
+                    : generateBasicArithmetic();
+            problem = mathProblem.get("problem");
+            solution = mathProblem.get("solution");
+        }
+
+        // 4. 방해 데이터 저장 (타입에 맞는 problem, solution이 들어감)
         Disturbance disturbance = new Disturbance(
                 gameType,
-                mathProblem.get("problem"),
-                mathProblem.get("solution"),
+                problem,
+                solution,
                 attacker,
                 target
         );
+
         disturbanceRepository.save(disturbance);
 
         // 5. 알림 전송
@@ -253,23 +262,39 @@ public class RoomService {
     }
 
     @Transactional
-    public void completeDisturbance(UUID disturbanceId, String userAnswer) {
+    public String completeDisturbance(UUID disturbanceId, String userAnswer) {
         Disturbance disturbance = disturbanceRepository.findById(disturbanceId)
                 .orElseThrow(() -> new RuntimeException("방해 데이터를 찾을 수 없습니다."));
 
-        // 정답 확인
-        if (disturbance.getSolution().equals(userAnswer)) {
-            disturbance.complete(); // 해결 상태로 변경
+        // 1. 숫자 야구인 경우
+        if ("baseball".equals(disturbance.getType())) {
+            String result = checkBaseball(disturbance.getSolution(), userAnswer);
 
-            // 1. 타겟 유저의 타이머 다시 시작!
-            RoomGuest target = disturbance.getTarget();
-            target.startIndividualTimer();
-
-            // 2. 웹소켓으로 "방해 끝남" 알림
-            notificationService.notifyDisturbanceCleared(disturbance);
-        } else {
-            throw new RuntimeException("WRONG_ANSWER"); // 틀리면 다시 풀게 함
+            if ("3S 0B".equals(result)) { // 홈런인 경우
+                handleDisturbanceSuccess(disturbance);
+                return "홈런! 방해 해제 완료.";
+            }
+            return result; // "1S 2B" 같은 힌트 리턴 (isResolved는 false 유지)
         }
+
+        // 2. 사칙연산인 경우
+        else {
+            if (disturbance.getSolution().equals(userAnswer)) {
+                handleDisturbanceSuccess(disturbance);
+                return "정답입니다!";
+            } else {
+                throw new RuntimeException("WRONG_ANSWER");
+            }
+        }
+    }
+
+    // 중복 코드를 줄이기 위한 헬퍼 메서드
+    private void handleDisturbanceSuccess(Disturbance disturbance) {
+        disturbance.complete();
+        disturbanceRepository.saveAndFlush(disturbance);
+        RoomGuest target = disturbance.getTarget();
+        target.startIndividualTimer();
+        notificationService.notifyDisturbanceCleared(disturbance);
     }
     private Map<String, String> generateMathProblem() {
         Random random = new Random();
@@ -337,5 +362,20 @@ public class RoomService {
         }
 
         return Map.of("problem", n1 + " " + op + " " + n2 + " = ?", "solution", String.valueOf(res));
+    }
+    private String generateBaseballSolution() {
+        List<Integer> numbers = new ArrayList<>(List.of(1, 2, 3, 4, 5, 6, 7, 8, 9));
+        Collections.shuffle(numbers);
+        return numbers.get(0).toString() + numbers.get(1).toString() + numbers.get(2).toString();
+    }
+
+    public String checkBaseball(String solution, String answer) {
+        int strikes = 0;
+        int balls = 0;
+        for (int i = 0; i < 3; i++) {
+            if (answer.charAt(i) == solution.charAt(i)) strikes++;
+            else if (solution.contains(String.valueOf(answer.charAt(i)))) balls++;
+        }
+        return strikes + "S " + balls + "B";
     }
 }
