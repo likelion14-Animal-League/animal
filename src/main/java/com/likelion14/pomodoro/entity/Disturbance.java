@@ -19,8 +19,12 @@ public class Disturbance {
     private UUID id;
 
     private String type; // "math", "word", "click" 등
-    private String content; // 예: "12 + 25 = ?" (문제 내용)
-    private String solution; // 예: "37" (정답)
+    // Disturbance.java
+    @Column(columnDefinition = "TEXT")
+    private String content;
+
+    @Column(columnDefinition = "TEXT")
+    private String solution;
 
     @ManyToOne
     private RoomGuest attacker;
@@ -45,14 +49,5 @@ public class Disturbance {
         this.isResolved = true;
     }
 
-    private String generateBaseballSolution() {
-        List<Integer> numbers = new ArrayList<>(List.of(1, 2, 3, 4, 5, 6, 7, 8, 9));
-        Collections.shuffle(numbers);
-        // 중복 없는 3자리 숫자 생성
-        return numbers.stream()
-                .limit(3)
-                .map(String::valueOf)
-                .collect(Collectors.joining());
-    }
 
 }
