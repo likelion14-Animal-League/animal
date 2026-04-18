@@ -245,6 +245,31 @@ public class RoomService {
             problem = mathProblem.get("problem");
             solution = mathProblem.get("solution");
         }
+        else if ("findSemicolon".equals(gameType)) {
+            Random random = new Random();
+            String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+            char targetChar = ';';
+            int totalLength = random.nextInt(21) + 40;
+            int targetCount = random.nextInt(4) + 2;
+
+            char[] puzzle = new char[totalLength];
+            for (int i = 0; i < totalLength; i++) {
+                puzzle[i] = chars.charAt(random.nextInt(chars.length()));
+            }
+
+            for (int i = 0; i < targetCount; i++) {
+                int targetIdx = random.nextInt(totalLength);
+                while (puzzle[targetIdx] == targetChar) {
+                    targetIdx = random.nextInt(totalLength);
+                }
+                puzzle[targetIdx] = targetChar;
+            }
+
+            // 1. [체크] problem 변수에 값이 제대로 할당되는지 확인!
+            // 텍스트 뒤에 공백이나 줄바꿈이 프론트에서 깨질 수 있으니 깔끔하게 처리합니다.
+            problem = "다음 문자열에서 '" + targetChar + "'는 몇 개일까요?|" + new String(puzzle);
+            solution = String.valueOf(targetCount);
+        }
         else if ("stroop".equals(gameType)) {
             String[] colorNames = {"빨강", "파랑", "초록", "노랑", "보라", "주황"};
             String[] colorHexCodes = {"#FF0000", "#0000FF", "#008000", "#FFFF00", "#800080", "#FFA500"};
@@ -288,6 +313,8 @@ public class RoomService {
         Disturbance disturbance = disturbanceRepository.findById(disturbanceId)
                 .orElseThrow(() -> new RuntimeException("방해 데이터를 찾을 수 없습니다."));
 
+        String cleanedAnswer = userAnswer.trim();
+
         // 1. 숫자 야구인 경우
         if ("baseball".equals(disturbance.getType())) {
             String result = checkBaseball(disturbance.getSolution(), userAnswer);
@@ -299,15 +326,17 @@ public class RoomService {
             return result; // "1S 2B" 같은 힌트 리턴 (isResolved는 false 유지)
         }
 
-        // 2. 사칙연산인 경우
-        else {
-            if (disturbance.getSolution().equals(userAnswer)) {
-                handleDisturbanceSuccess(disturbance);
-                return "정답입니다!";
-            } else {
-                throw new RuntimeException("WRONG_ANSWER");
-            }
+        // 2. 그 외 모든 단답형 게임 (math, findSemicolon, stroop)
+        // 스트루프는 "빨강"처럼 한글이고, 세미콜론은 "3"처럼 숫자 형태입니다.
+        if (disturbance.getSolution().equalsIgnoreCase(cleanedAnswer)) {
+            handleDisturbanceSuccess(disturbance);
+            return "정답입니다!";
+        } else {
+            // 여기서 예외를 던지면 컨트롤러에서 400 에러를 낼 텐데,
+            // 사용자에게 "틀렸습니다"라고 친절하게 알려주려면 메시지를 리턴하는 게 나을 수도 있어요.
+            throw new RuntimeException("WRONG_ANSWER");
         }
+
     }
 
     // 중복 코드를 줄이기 위한 헬퍼 메서드
