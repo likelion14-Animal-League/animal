@@ -21,6 +21,9 @@ public class Room {
     private UUID id = UUID.randomUUID();
     private UUID currentLeaderId;
 
+    @Column(name = "expires_at")
+    private LocalDateTime expiresAt;
+
     @Column(unique = true, length = 6, nullable = false)
     private String roomCode;
 
@@ -43,6 +46,7 @@ public class Room {
         this.pomodoroMinutes = pomodoroMinutes;
         this.breakMinutes = breakMinutes;
         this.disturbLevel = disturbLevel;
+        this.expiresAt = LocalDateTime.now().plusHours(4);
 
     }
     // Room.java 에 이 메서드를 추가하세요

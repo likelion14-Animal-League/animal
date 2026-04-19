@@ -132,6 +132,14 @@ public class RoomController {
         return ResponseEntity.ok(Map.of("message", "타이머가 시작되었습니다."));
     }
 
+    // RoomController.java
+
+    @GetMapping("/sessions/{roomId}/disturbance/history")
+    public ResponseEntity<?> getDisturbHistory(@PathVariable UUID roomId) {
+        Map<String, Object> history = roomService.getDisturbanceHistory(roomId);
+        return ResponseEntity.ok(history);
+    }
+
     // 5. 내 타이머 일시정지
     @PostMapping("/me/pause")
     public ResponseEntity<?> pauseMe(@RequestHeader("X-Guest-Token") String token) {

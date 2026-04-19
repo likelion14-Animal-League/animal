@@ -487,6 +487,45 @@ public class RoomService {
         return newLeader;
     }
 
+    // RoomService.java
+
+    @Scheduled(fixedRate = 60000) // 1분마다 실행
+    @Transactional
+    public void cleanupExpiredRooms() {
+        LocalDateTime now = LocalDateTime.now();
+        // 만료 시간이 지난 방들을 조회
+        List<Room> expiredRooms = roomRepository.findAllByExpiresAtBefore(now);
+
+        if (!expiredRooms.isEmpty()) {
+            expiredRooms.forEach(room -> {
+                System.out.println("방 만료 삭제: " + room.getRoomCode());
+                // CascadeType.ALL 설정으로 인해 관련 게스트와 방해 데이터가 함께 삭제됩니다
+                roomRepository.delete(room);
+            });
+        }
+    }
+
+    // RoomService.java
+
+    public Map<String, Object> getDisturbanceHistory(UUID roomId) {
+        // 해당 방(Room)의 모든 참여자들의 방해 이력을 가져옵니다.
+        // (Disturbance 엔티티에 room_id가 있거나, 참여자를 통해 조회)
+        List<Disturbance> history = disturbanceRepository.findAllByTargetRoomIdOrderByCreatedAtDesc(roomId);
+
+        List<Map<String, Object>> mappedHistory = history.stream().map(d -> {
+            Map<String, Object> item = new HashMap<>();
+            item.put("id", d.getId()); //[cite: 38]
+            item.put("type", d.getType()); //[cite: 38]
+            item.put("senderGuestId", d.getAttacker().getId()); //[cite: 38]
+            item.put("targetGuestId", d.getTarget().getId()); //[cite: 38]
+            item.put("sentAt", d.getCreatedAt()); //[cite: 38]
+            item.put("cleared", d.isResolved()); //[cite: 38]
+            return item;
+        }).collect(Collectors.toList());
+
+        return Map.of("disturbances", mappedHistory); //[cite: 38]
+    }
+
     public Map<String, Object> getSessionResult(UUID roomId) {
         List<RoomGuest> participants = guestRepository.findByRoomId(roomId); //
 
